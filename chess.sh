@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# TODO - make turn_r global
-
 # Setup, dependencies
 bgLight="\033[48;5;235m"
 reset="\033[0m"
+turn_r=0  # global variable that flips every time the turn is handed off
 
 declare -A light_pieces
 light_pieces["a2"]="♟"
@@ -59,7 +58,6 @@ draw_board() {  # just draws the board, same for both turns
 }
 
 print_coords() {  # prints the rank and file labels depending on turn
-  local turn_r=$1
   tput sgr0
   if [[ $turn_r -eq 0 ]]; then
     for i in {0..7}; do
@@ -88,9 +86,8 @@ turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
 }
 
 print_char() {  # actually prints the piece given the turn, unicode char, and position (currently in <letter><number> will probably change)
-  local turn_r=$1
-  local piece_type=$2
-  local piece_pos=$3
+  local piece_type=$1
+  local piece_pos=$2
   local temp_file=${piece_pos:0:1}
   local rank=${piece_pos:1:1}
   if [[ "$temp_file" =~ [a-h] ]]; then
@@ -111,51 +108,74 @@ print_char() {  # actually prints the piece given the turn, unicode char, and po
 }
 
 print_all() {
-  local turn_r=$1
   draw_board
-  print_coords "$turn_r"
+  print_coords
   for pos in "${!light_pieces[@]}"; do
-    print_char "$turn_r" "${light_pieces[$pos]}" "$pos"
+    print_char "${light_pieces[$pos]}" "$pos"
   done
   for pos in "${!dark_pieces[@]}"; do
-    print_char "$turn_r" "${dark_pieces[$pos]}" "$pos"
+    print_char "${dark_pieces[$pos]}" "$pos"
   done
-
 }
 
 
 
 # Main logic
+check_valid_input() {  # checks for correct length
+  local move=$1
+  if [[ ${#move} -gt 4 || ${#move} -lt 4 ]]; then
+    return 1
+  fi
+  return 0
+}
 
-check_within_board() {
+check_within_board() {  # make sure within board
   local proposed_pos=$1
-  # make sure within board
+  local file="${proposed_pos:0:1}"
+  local rank="${proposed_pos:1:1}"
+  if [[ "$rank" -lt 1 || "$rank" -gt 8 ]]; then
+    return 1
+  fi
+  case $file in
+    'a') return 0;;
+    'b') return 0;;
+    'c') return 0;;
+    'd') return 0;;
+    'e') return 0;;
+    'f') return 0;;
+    'g') return 0;;
+    'h') return 0;;
+  esac
+  return 1
 }
 
-check_not_friendly() {
-  local turn_r=$1
-  local proposed_pos=$2
-  #check black/white piece already occupies square
+check_not_friendly() {  # check black/white piece already occupies square
+  local proposed_pos=$1
 }
 
-check_piece_moves() {
+check_piece_moves() {  # is pawn, knight, queen, king...
   local piece_type=$1
   local piece_pos=$2
-  # is king, is queen, is pawn, rook...
 }
 
-check_if_valid_move() {  # in this order
-  local turn_r=$1
-  local move=$2
-  check_valid_input
-  check_within_board
-  check_not_friendly
-  check_piece_moves
+check_if_valid_move() {
+  local move=$1
+  local from="${move:0:2}"
+  local to="${move:2:2}"
+  local piece="*"
+  if [[ $turn_r -eq 0 ]]; then
+    piece=${light_pieces[$from]}
+  else
+    piece=${dark_pieces[$from]}
+  fi
+  check_valid_input "$move"
+  check_within_board "$to"
+  check_not_friendly "$to"
+  check_piece_moves "$piece" "$to"
 }
 
 move_piece() {
-  local turn_r=$1
-  local move=$2
+  local move=$1
   local from="${move:0:2}"
   local to="${move:2:2}"
   if [[ turn_r -eq 0 ]]; then
@@ -178,21 +198,17 @@ clear
 trap 'tput cnorm; tput rmcup; exit 0' INT TERM EXIT
 
 while true; do
-  print_all "$turn_r"    # print board, pieces grid labels
+  print_all
   if [[ turn_r -eq 0 ]]; then
     tput cup 25 66       # move cursor to setup for input
-    read -p -r "W > " move  # prompt for move, store in move var
-    if check_if_valid_move "$turn_r" "$move"; then
-      move_piece "$turn_r" "$move"
-      turn_r=$turn_r+1
-      turn=$turn+1
-    else
-      echo "no  . _ ."
-    fi
+    read -p "W > " move  # prompt for move, store in move var
+    move_piece "$move"
+    turn_r=$turn_r+1
+    turn=$turn+1
   else
     tput cup 25 66
-    read -p  -r "B > " move
-    # move_piece "$turn_r" "$move"
+    read -p "B > " move
+    move_piece "$turn_r" "$move"
     turn_r=$turn_r-1
     turn=$turn+1
   fi
