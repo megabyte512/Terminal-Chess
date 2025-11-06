@@ -78,7 +78,7 @@ print_coords() {  # prints the rank and file labels depending on turn
   fi
 }
 
-convert_coords() {  # changes simple <letter><number> coords into <number><number> coords
+convert_UCI() {  # changes simple <letter><number> coords into <number><number> coords
   true
 }
 
@@ -110,6 +110,21 @@ print_char() {  # actually prints the piece given the turn, unicode char, and po
   fi
 }
 
+print_all() {
+  local turn_r=$1
+  draw_board
+  print_coords "$turn_r"
+  for pos in "${!light_pieces[@]}"; do
+    print_char "$turn_r" "${light_pieces[$pos]}" "$pos"
+  done
+  for pos in "${!dark_pieces[@]}"; do
+    print_char "$turn_r" "${dark_pieces[$pos]}" "$pos"
+  done
+
+}
+
+
+
 # Main logic
 
 check_within_board() {
@@ -130,11 +145,31 @@ check_piece_moves() {
 }
 
 check_if_valid_move() {  # in this order
+  local turn_r=$1
+  local move=$2
+  check_valid_input
   check_within_board
   check_not_friendly
   check_piece_moves
 }
 
+move_piece() {
+  local turn_r=$1
+  local move=$2
+  local from="${move:0:2}"
+  local to="${move:2:2}"
+  if [[ turn_r -eq 0 ]]; then
+    unset 'dark_pieces['"$to"']'
+    # Move the piece
+    light_pieces["$to"]="${light_pieces[$from]}"
+    unset 'light_pieces['"$from"']'
+  else
+    unset 'light_pieces['"$to"']'
+    # Move the piece
+    dark_pieces["$to"]="${dark_pieces[$from]}"
+    unset 'dark_pieces['"$from"']'
+  fi
+}
 # setting up terminal to clear and hide cursor
 tput smcup
 tput civis
@@ -142,26 +177,24 @@ clear
 # upon exit, run these
 trap 'tput cnorm; tput rmcup; exit 0' INT TERM EXIT
 
-draw_board
-print_coords 0
-for pos in "${!light_pieces[@]}"; do
-  print_char 0 "${light_pieces[$pos]}" "$pos"
-done
-for pos in "${!dark_pieces[@]}"; do
-  print_char 0 "${dark_pieces[$pos]}" "$pos"
-done
-
 while true; do
-  tput cup 25 66
+  print_all "$turn_r"    # print board, pieces grid labels
   if [[ turn_r -eq 0 ]]; then
-    read -p "W > " move
-    turn_r=$turn_r+1
-    tput cup 25 66
-    echo "              "
+    tput cup 25 66       # move cursor to setup for input
+    read -p -r "W > " move  # prompt for move, store in move var
+    if check_if_valid_move "$turn_r" "$move"; then
+      move_piece "$turn_r" "$move"
+      turn_r=$turn_r+1
+      turn=$turn+1
+    else
+      echo "no  . _ ."
+    fi
   else
-    read -p "B > " move
-    turn_r=$turn_r-1
     tput cup 25 66
-    echo "              "
+    read -p  -r "B > " move
+    # move_piece "$turn_r" "$move"
+    turn_r=$turn_r-1
+    turn=$turn+1
   fi
+  clear
 done
