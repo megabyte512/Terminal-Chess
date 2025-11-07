@@ -76,8 +76,14 @@ print_coords() {  # prints the rank and file labels depending on turn
   fi
 }
 
-convert_UCI() {  # changes simple <letter><number> coords into <number><number> coords
-  true
+convert_UCI_to_coords() {  # converts <letter><number> to <number><number>
+  local UCI=$1
+  local file="${UCI:0:1}"
+  local rank="${UCI:1:1}"
+  if [[ "$file" =~ [a-h] ]]; then
+    num_file=$(($(printf '%d' "'$file") - 96))  # a rather elegant solution I found online to convert file to numbers 1-8 (using their ascii codes)
+  fi
+  echo "$num_file $rank"
 }
 
 turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
@@ -88,11 +94,8 @@ turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
 print_char() {  # actually prints the piece given the turn, unicode char, and position (currently in <letter><number> will probably change)
   local piece_type=$1
   local piece_pos=$2
-  local temp_file=${piece_pos:0:1}
-  local rank=${piece_pos:1:1}
-  if [[ "$temp_file" =~ [a-h] ]]; then
-    file=$(($(printf '%d' "'$temp_file") - 96))  # a rather elegant solution I found online to convert file to numbers 1-8 (using their ascii codes)
-  fi
+  converted_coords=$(convert_UCI_to_coords "$piece_pos")
+  read file rank <<< "$converted_coords"
   # where we print the pieces depending on orientation of board.
   if [[ $turn_r -eq 0 ]]; then
     tput cup "$((28-3*rank))" "$((7*file+3))" 
@@ -208,7 +211,7 @@ while true; do
   else
     tput cup 25 66
     read -p "B > " move
-    move_piece "$turn_r" "$move"
+    move_piece "$move"
     turn_r=$turn_r-1
     turn=$turn+1
   fi
