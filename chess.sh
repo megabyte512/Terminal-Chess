@@ -89,6 +89,7 @@ convert_UCI_to_coords() {  # converts <letter><number> to <number><number>
 turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
   local turn=$1
   turn_r=$((turn%2))
+  echo "$turn_r"
 }
 
 print_char() {  # actually prints the piece given the turn, unicode char, and position (currently in <letter><number> will probably change)
@@ -126,55 +127,74 @@ print_all() {
 # Main logic
 check_valid_input() {  # checks for correct length
   local move=$1
-  if [[ ${#move} -gt 4 || ${#move} -lt 4 ]]; then
+  if [[ ${#move} -ne 4 ]]; then
     return 1
   fi
   return 0
 }
 
 check_within_board() {  # make sure within board
-  local proposed_pos=$1
-  local file="${proposed_pos:0:1}"
-  local rank="${proposed_pos:1:1}"
-  if [[ "$rank" -lt 1 || "$rank" -gt 8 ]]; then
+  local proposed_file=$1
+  local proposed_rank=$2
+  if [[ "$proposed_file" -lt 1 || "$proposed_file" -gt 8 || "$proposed_rank" -lt 1 || "$proposed_rank" -gt 8 ]]; then
     return 1
   fi
-  case $file in
-    'a') return 0;;
-    'b') return 0;;
-    'c') return 0;;
-    'd') return 0;;
-    'e') return 0;;
-    'f') return 0;;
-    'g') return 0;;
-    'h') return 0;;
-  esac
-  return 1
+  return 0
 }
 
 check_not_friendly() {  # check black/white piece already occupies square
   local proposed_pos=$1
+  if [[ "$turn_r" -eq 0 ]]; then
+    if [[ -n "${light_pieces[$proposed_pos]}" ]]; then
+      return 1
+    fi
+  else
+    if [[ -n "${dark_pieces[$proposed_pos]}" ]]; then
+      return 1
+    fi
+  fi
+  return 0
 }
 
 check_piece_moves() {  # is pawn, knight, queen, king...
   local piece_type=$1
-  local piece_pos=$2
+  local from=$2
+  converted_coords=$(convert_UCI_to_coords "$from")
+  read file rank <<< "$converted_coords"
+  local proposed_file=$3
+  local proposed_rank=$4
+  case $piece_type in
+    "♟") ;;
+    "♜") ;;
+    "♞") ;;
+    "♝") ;;
+    "♛") ;;
+    "♚") ;;
+    "♙") ;;
+    "♖") ;;
+    "♘") ;;
+    "♗") ;;
+    "♕") ;;
+    "♔") ;;
+  esac
+  return 0
 }
 
 check_if_valid_move() {
-  local move=$1
+  local move=$1  # in UCI
   local from="${move:0:2}"
   local to="${move:2:2}"
-  local piece="*"
+  converted_to=$(convert_UCI_to_coords "$to")
+  read file rank <<< "$converted_to"
   if [[ $turn_r -eq 0 ]]; then
     piece=${light_pieces[$from]}
   else
     piece=${dark_pieces[$from]}
   fi
   check_valid_input "$move"
-  check_within_board "$to"
+  check_within_board "$file" "$rank"
   check_not_friendly "$to"
-  check_piece_moves "$piece" "$to"
+  check_piece_moves "$piece" "$from" "$file" "$rank"
 }
 
 move_piece() {
