@@ -5,42 +5,18 @@ bgLight="\033[48;5;235m"
 reset="\033[0m"
 turn_r=0  # global variable that flips every time the turn is handed off
 
-declare -A light_pieces
-light_pieces["a2"]="♟"
-light_pieces["b2"]="♟"
-light_pieces["c2"]="♟"
-light_pieces["d2"]="♟"
-light_pieces["e2"]="♟"
-light_pieces["f2"]="♟"
-light_pieces["g2"]="♟"
-light_pieces["h2"]="♟"
-light_pieces["a1"]="♜"
-light_pieces["b1"]="♞"
-light_pieces["c1"]="♝"
-light_pieces["d1"]="♛"
-light_pieces["e1"]="♚"
-light_pieces["f1"]="♝"
-light_pieces["g1"]="♞"
-light_pieces["h1"]="♜"
+declare -A board
 
-declare -A dark_pieces
-dark_pieces["a7"]="♙"
-dark_pieces["b7"]="♙"
-dark_pieces["c7"]="♙"
-dark_pieces["d7"]="♙"
-dark_pieces["e7"]="♙"
-dark_pieces["f7"]="♙"
-dark_pieces["g7"]="♙"
-dark_pieces["h7"]="♙"
-dark_pieces["a8"]="♖"
-dark_pieces["b8"]="♘"
-dark_pieces["c8"]="♗"
-dark_pieces["d8"]="♕"
-dark_pieces["e8"]="♔"
-dark_pieces["f8"]="♗"
-dark_pieces["g8"]="♘"
-dark_pieces["h8"]="♖"
+for row in {0..7}; do
+  for col in {0..7}; do
+    board[$col,$row]=""
+  done
+done
 
+board[0,7]="♖"; board[1,7]="♘"; board[2,7]="♗"; board[3,7]="♕"; board[4,7]="♔"; board[5,7]="♗"; board[6,7]="♘"; board[7,7]="♖";
+board[0,6]="♙"; board[1,6]="♙"; board[2,6]="♙"; board[3,6]="♙"; board[4,6]="♙"; board[5,6]="♙"; board[6,6]="♙"; board[7,6]="♙";
+board[0,1]="♟"; board[1,1]="♟"; board[2,1]="♟"; board[3,1]="♟"; board[4,1]="♟"; board[5,1]="♟"; board[6,1]="♟"; board[7,1]="♟";
+board[0,0]="♜"; board[1,0]="♞"; board[2,0]="♝"; board[3,0]="♛"; board[4,0]="♚"; board[5,0]="♝"; board[6,0]="♞"; board[7,0]="♜";
 
 draw_board() {  # just draws the board, same for both turns
   tput cup 3 7
@@ -81,12 +57,13 @@ convert_UCI_to_coords() {  # converts <letter><number> to <number><number>
   local file="${UCI:0:1}"
   local rank="${UCI:1:1}"
   if [[ "$file" =~ [a-h] ]]; then
-    num_file=$(($(printf '%d' "'$file") - 96))  # a rather elegant solution I found online to convert file to numbers 1-8 (using their ascii codes)
+    file=$(($(printf '%d' "'$file") - 97))  # a rather elegant solution I found online to convert file to numbers 0-7 (using their ascii codes)
   fi
-  echo "$num_file $rank"
+  rank=$((rank-1))
+  echo "$file $rank"
 }
 
-turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
+turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0) I don't think I'll need this but it's here if I do
   local turn=$1
   turn_r=$((turn%2))
   echo "$turn_r"
@@ -94,14 +71,13 @@ turn_remainder() {  # returns the turn remainder with %. (e.g. 13%2=1, 54%2=0)
 
 print_char() {  # actually prints the piece given the turn, unicode char, and position (currently in <letter><number> will probably change)
   local piece_type=$1
-  local piece_pos=$2
-  converted_coords=$(convert_UCI_to_coords "$piece_pos")
-  read file rank <<< "$converted_coords"
+  local file=$2
+  local rank=$3
   # where we print the pieces depending on orientation of board.
   if [[ $turn_r -eq 0 ]]; then
-    tput cup "$((28-3*rank))" "$((7*file+3))" 
+    tput cup "$((25-3*rank))" "$((7*file+10))" 
   else
-    tput cup "$((1+3*rank))" "$((66-7*file))"
+    tput cup "$((4+3*rank))" "$((59-7*file))"
   fi
   # print the piece with respective background
   if [[ $(((rank+file)%2)) -eq 0 ]]; then  # checking if it's on light or dark square
@@ -112,14 +88,19 @@ print_char() {  # actually prints the piece given the turn, unicode char, and po
 }
 
 print_all() {
+  local error=$1
   draw_board
   print_coords
-  for pos in "${!light_pieces[@]}"; do
-    print_char "${light_pieces[$pos]}" "$pos"
+  for row in {0..7}; do
+    for col in {0..7}; do
+      local piece="${board[$col,$row]}"
+      if [[ -n "$piece" ]]; then  # only print if there's a piece on that square
+        print_char "$piece" "$col" "$row"
+      fi
+    done
   done
-  for pos in "${!dark_pieces[@]}"; do
-    print_char "${dark_pieces[$pos]}" "$pos"
-  done
+  tput cup 27 66
+  echo "$error"
 }
 
 
@@ -136,82 +117,145 @@ check_valid_input() {  # checks for correct length
 check_within_board() {  # make sure within board
   local proposed_file=$1
   local proposed_rank=$2
-  if [[ "$proposed_file" -lt 1 || "$proposed_file" -gt 8 || "$proposed_rank" -lt 1 || "$proposed_rank" -gt 8 ]]; then
+  if [[ "$proposed_file" -lt 0 || "$proposed_file" -gt 7 || "$proposed_rank" -lt 0 || "$proposed_rank" -gt 7 ]]; then
     return 1
   fi
   return 0
 }
 
 check_not_friendly() {  # check black/white piece already occupies square
-  local proposed_pos=$1
+  local proposed_file=$1
+  local proposed_rank=$2
+  local piece="${board[$proposed_file,$proposed_rank]}"  # we could just pass the piece at proposed location, but I think this is cleaner and more contained
   if [[ "$turn_r" -eq 0 ]]; then
-    if [[ -n "${light_pieces[$proposed_pos]}" ]]; then
-      return 1
-    fi
+    case $piece in
+      "♟"|"♞"|"♝"|"♜"|"♛"|"♚")  # if the turn is wihte and the proposed move already equals one of these pieces, fail
+        return 1 ;;
+    esac
   else
-    if [[ -n "${dark_pieces[$proposed_pos]}" ]]; then
-      return 1
-    fi
+    case $piece in
+      "♙"|"♘"|"♗"|"♖"|"♕"|"♔")  # if turn is black and proposed square has a black piece, we know it's friendly
+        return 1 ;;
+    esac
   fi
   return 0
+}
+
+check_moving_self() {
+  local from=$1
+  converted_coords=$(convert_UCI_to_coords "$from")
+  local file rank; read file rank <<< "$converted_coords"
+  local piece="${board[$file,$rank]}"
+  if [[ "$turn_r" -eq 0 ]]; then  # if white's turn, make sure the space we're moving from is a white piece
+    case $piece in
+      "♟"|"♞"|"♝"|"♜"|"♛"|"♚")
+        return 0 ;;
+    esac
+  else
+    case $piece in
+      "♙"|"♘"|"♗"|"♖"|"♕"|"♔")
+        return 0 ;;
+    esac
+  fi
+  return 1
+}
+
+check_check() {  # checks if king is in check after proposed move
+  local piece_type=$1
+  local to=$2
+  # will need to check for turn
+  true
 }
 
 check_piece_moves() {  # is pawn, knight, queen, king...
   local piece_type=$1
-  local from=$2
-  converted_coords=$(convert_UCI_to_coords "$from")
-  read file rank <<< "$converted_coords"
-  local proposed_file=$3
-  local proposed_rank=$4
+  local xfile=$2
+  local xrank=$3
+  local proposed_file=$4
+  local proposed_rank=$5
+
+  local file_diff=$((xfile-proposed_file))
+  local rank_diff=$((xrank-proposed_rank))
+  local abs_file_diff=${file_diff#-}
+  local abs_rank_diff=${rank_diff#-}
+
+  # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
-    "♟") ;;
-    "♜") ;;
-    "♞") ;;
-    "♝") ;;
-    "♛") ;;
-    "♚") ;;
-    "♙") ;;
-    "♖") ;;
-    "♘") ;;
-    "♗") ;;
-    "♕") ;;
-    "♔") ;;
+    "♟") return 1;;
+    "♜") return 1;;
+    "♞"|"♘") 
+      if [[ ($abs_file_diff -eq 2 && $abs_rank_diff -eq 1) || ($abs_file_diff -eq 1 && $abs_rank_diff -eq 2) ]]; then
+        return 0
+      fi
+      return 1
+      ;;
+    "♝") return 1;;
+    "♛") return 1;;
+    "♚") return 1;;
+    "♙") return 1;;
+    "♖") return 1;;
+    "♗") return 1;;
+    "♕") return 1;;
+    "♔") return 1;;
+    *) return 1;;
   esac
+}
+
+check_if_legal_move() {
+  local move=$1  # in UCI
+  local from="${move:0:2}"  # moving from in UCI
+  local to="${move:2:2}"  # moving to in UCI
+
+  converted_from=$(convert_UCI_to_coords "${move:0:2}")
+  local xfile xrank; read xfile xrank <<< "$converted_from"  # file and rank in <num><num> (0-7)
+  converted_to=$(convert_UCI_to_coords "$to")
+  local file rank; read file rank <<< "$converted_to"  # file and rank in <num><num> (0-7)
+  local piece="${board[$xfile,$xrank]}"
+
+  if ! check_valid_input "$move"; then
+    echo "Invalid input"
+    return 1
+  fi
+
+  if ! check_within_board "$file" "$rank"; then
+    echo "no  . _ ."
+    return 1
+  fi
+
+  if ! check_not_friendly "$file" "$rank"; then
+    echo "Cannot capture self"
+    return 1
+  fi
+
+  if ! check_moving_self "$from"; then
+    echo "Move your own pieces"
+    return 1
+  fi
+
+  # move this to after check_piece_moves
+  # if ! check_check "$piece" "$to"; then
+  #   return 1
+  # fi
+
+  if ! check_piece_moves "$piece" "$xfile" "$xrank" "$file" "$rank"; then
+    echo "Invalid move"
+    return 1
+  fi
+
   return 0
 }
 
-check_if_valid_move() {
-  local move=$1  # in UCI
-  local from="${move:0:2}"
-  local to="${move:2:2}"
-  converted_to=$(convert_UCI_to_coords "$to")
-  read file rank <<< "$converted_to"
-  if [[ $turn_r -eq 0 ]]; then
-    piece=${light_pieces[$from]}
-  else
-    piece=${dark_pieces[$from]}
-  fi
-  check_valid_input "$move"
-  check_within_board "$file" "$rank"
-  check_not_friendly "$to"
-  check_piece_moves "$piece" "$from" "$file" "$rank"
-}
-
-move_piece() {
+move_piece() {  # just move the piece assuming all legality checks have been done
   local move=$1
-  local from="${move:0:2}"
-  local to="${move:2:2}"
-  if [[ turn_r -eq 0 ]]; then
-    unset 'dark_pieces['"$to"']'
-    # Move the piece
-    light_pieces["$to"]="${light_pieces[$from]}"
-    unset 'light_pieces['"$from"']'
-  else
-    unset 'light_pieces['"$to"']'
-    # Move the piece
-    dark_pieces["$to"]="${dark_pieces[$from]}"
-    unset 'dark_pieces['"$from"']'
-  fi
+
+  converted_from=$(convert_UCI_to_coords "${move:0:2}")
+  local xfile xrank; read xfile xrank <<< "$converted_from"  # file and rank in <num><num> (0-7)
+  converted_to=$(convert_UCI_to_coords "${move:2:2}")
+  local file rank; read file rank <<< "$converted_to"  # file and rank in <num><num> (0-7)
+
+  local piece="${board[$xfile,$xrank]}"  # save piece that we'll move
+  board[$xfile,$xrank]=""  # empty it's old location
+  board[$file,$rank]="$piece"  # give new location the piece type
 }
 # setting up terminal to clear and hide cursor
 tput smcup
@@ -221,19 +265,29 @@ clear
 trap 'tput cnorm; tput rmcup; exit 0' INT TERM EXIT
 
 while true; do
-  print_all
+  print_all "$error"
   if [[ turn_r -eq 0 ]]; then
     tput cup 25 66       # move cursor to setup for input
     read -p "W > " move  # prompt for move, store in move var
-    move_piece "$move"
-    turn_r=$turn_r+1
-    turn=$turn+1
+    if check_if_legal_move "$move"; then
+      move_piece "$move"
+      turn_r=$((turn_r+1))
+      turn=$((turn+1))
+      error=""
+    else
+      error=$(check_if_legal_move "$move")
+    fi
   else
     tput cup 25 66
     read -p "B > " move
-    move_piece "$move"
-    turn_r=$turn_r-1
-    turn=$turn+1
+    if check_if_legal_move "$move"; then
+      move_piece "$move"
+      turn_r=$((turn_r-1))
+      turn=$((turn+1))
+      error=""
+    else
+      error=$(check_if_legal_move "$move")
+    fi
   fi
   clear
 done
