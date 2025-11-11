@@ -174,29 +174,57 @@ check_piece_moves() {  # is pawn, knight, queen, king...
   local proposed_file=$4
   local proposed_rank=$5
 
-  local file_diff=$((xfile-proposed_file))
-  local rank_diff=$((xrank-proposed_rank))
-  local abs_file_diff=${file_diff#-}
+  local file_diff=$((proposed_file-xfile))
+  local rank_diff=$((proposed_rank-xrank))
+  local abs_file_diff=${file_diff#-}  # most pieces move symmetrically, so these values can help us abstract a lot
   local abs_rank_diff=${rank_diff#-}
 
   # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
-    "♟") return 1;;
-    "♜") return 1;;
+    "♟")
+      if [[ $xrank -eq 1 ]]; then
+        true
+      else
+        true
+      fi
+      ;;
+    "♜"|"♖")
+      if [[ ($abs_file_diff -gt 0 && $abs_rank_diff -eq 0) || ($abs_file_diff -eq 0 && $abs_rank_diff -gt 0) ]]; then
+        return 0  # needs to check for pieces in the way
+      fi
+      return 1
+      ;;
     "♞"|"♘") 
       if [[ ($abs_file_diff -eq 2 && $abs_rank_diff -eq 1) || ($abs_file_diff -eq 1 && $abs_rank_diff -eq 2) ]]; then
         return 0
       fi
       return 1
       ;;
-    "♝") return 1;;
-    "♛") return 1;;
-    "♚") return 1;;
-    "♙") return 1;;
-    "♖") return 1;;
-    "♗") return 1;;
-    "♕") return 1;;
-    "♔") return 1;;
+    "♝"|"♗")
+      if [[ $abs_file_diff -eq $abs_rank_diff ]]; then
+        return 0  # needs to check for pieces in the way
+      fi
+      return 1
+      ;;
+    "♛"|"♕")
+      if [[ ($abs_file_diff -gt 0 && $abs_rank_diff -eq 0) || ($abs_file_diff -eq 0 && $abs_rank_diff -gt 0) || ($abs_file_diff -eq $abs_rank_diff) ]]; then  # just a bishop and rook
+        return 0  # still needs to check for pieces in the way
+      fi
+      return 1
+      ;;
+    "♚"|"♔")
+      if [[ $abs_file_diff -lt 2 && $abs_rank_diff -lt 2 ]]; then
+        return 0
+      fi
+      return 1
+      ;;
+    "♙")
+      if [[ $xrank -eq 6 ]]; then
+        true
+      else
+        true
+      fi
+      ;;
     *) return 1;;
   esac
 }
@@ -228,7 +256,7 @@ check_if_legal_move() {
   fi
 
   if ! check_moving_self "$from"; then
-    echo "Move your own pieces"
+    echo "Move a piece"
     return 1
   fi
 
