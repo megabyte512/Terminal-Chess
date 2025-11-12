@@ -182,11 +182,14 @@ check_piece_moves() {  # is pawn, knight, queen, king...
   # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
     "♟")
-      if [[ $xrank -eq 1 ]]; then
-        true
-      else
-        true
+      if [[ $xrank -eq 1 && $rank_diff -lt 3 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank-1))]} == "" ]]; then
+        return 0  # first move, two squares ahead are empty
+      elif [[ $rank_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+        return 0  # moving forward one, space ahead is empty
+      elif [[ $rank_diff -eq 1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
+        return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
       fi
+      return 1
       ;;
     "♜"|"♖")
       if [[ ($abs_file_diff -gt 0 && $abs_rank_diff -eq 0) || ($abs_file_diff -eq 0 && $abs_rank_diff -gt 0) ]]; then
@@ -219,13 +222,18 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 1
       ;;
     "♙")
-      if [[ $xrank -eq 6 ]]; then
-        true
-      else
-        true
+      if [[ $xrank -eq 6 && $rank_diff -gt -3 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank+1))]} == "" ]]; then
+        return 0  # first move, two squares ahead are empty
+      elif [[ $rank_diff -eq -1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+        return 0  # moving forward one, space ahead is empty
+      elif [[ $rank_diff -eq -1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
+        return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
       fi
+      return 1
       ;;
-    *) return 1;;
+    *) 
+      return 1  # just in case. Idk
+      ;;
   esac
 }
 
