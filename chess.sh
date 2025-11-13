@@ -192,8 +192,11 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 1
       ;;
     "♜"|"♖")
-      if [[ ($abs_file_diff -gt 0 && $abs_rank_diff -eq 0) || ($abs_file_diff -eq 0 && $abs_rank_diff -gt 0) ]]; then
+      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horozontally
         return 0  # needs to check for pieces in the way
+      fi
+      if [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
+        return 0
       fi
       return 1
       ;;
@@ -210,8 +213,14 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 1
       ;;
     "♛"|"♕")
-      if [[ ($abs_file_diff -gt 0 && $abs_rank_diff -eq 0) || ($abs_file_diff -eq 0 && $abs_rank_diff -gt 0) || ($abs_file_diff -eq $abs_rank_diff) ]]; then  # just a bishop and rook
+      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horozontally
         return 0  # still needs to check for pieces in the way
+      fi
+      if [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
+        return 0
+      fi
+      if [[ $abs_file_diff -eq $abs_rank_diff ]]; then  # moving diagonally
+        return 0
       fi
       return 1
       ;;
