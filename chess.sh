@@ -85,10 +85,12 @@ print_char() {  # actually prints the piece given the turn, unicode char, and po
   else
     echo -e "${bgLight}$piece_type"
   fi
+  tput sgr0
 }
 
 print_all() {
   local error=$1
+  tput sgr0
   draw_board
   print_coords
   for row in {0..7}; do
@@ -160,12 +162,6 @@ check_moving_self() {
   return 1
 }
 
-check_check() {  # checks if king is in check after proposed move
-  local piece_type=$1
-  local to=$2
-  # will need to check for turn
-  true
-}
 
 check_piece_moves() {  # is pawn, knight, queen, king...
   local piece_type=$1
@@ -192,13 +188,38 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 1
       ;;
     "♜"|"♖")
-      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horozontally
-        return 0  # needs to check for pieces in the way
+      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horizontally
+        if [[ $file_diff -gt 0 ]]; then  # moving right
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile+i)),$xrank]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 ]]; then  # moving left
+          for (( i=1; i< abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$xrank]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        fi
+      elif [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
+        if [[ $rank_diff -gt 0 ]]; then  # moving forward (white, works for black, but black would be moving "backwards" in this case)
+          for (( i=1; i<abs_rank_diff; i++ )); do
+            if [[ -n "${board[$xfile,$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $rank_diff -lt 0 ]]; then  # moving backward
+          for (( i=1; i<abs_rank_diff; i++ )); do
+            if [[ -n "${board[$xfile,$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        fi
+      else
+        return 1  # moving at some diagonal
       fi
-      if [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
-        return 0
-      fi
-      return 1
+      return 0  # passed all checks
       ;;
     "♞"|"♘") 
       if [[ ($abs_file_diff -eq 2 && $abs_rank_diff -eq 1) || ($abs_file_diff -eq 1 && $abs_rank_diff -eq 2) ]]; then
@@ -208,21 +229,99 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       ;;
     "♝"|"♗")
       if [[ $abs_file_diff -eq $abs_rank_diff ]]; then
-        return 0  # needs to check for pieces in the way
+        if [[ $file_diff -gt 0 && $rank_diff -gt 0 ]]; then  # moving top-right
+          for (( i=1; i<abs_file_diff; i++ )); do  # we can use abs_file_diff to parse all four scenarios because it is the same as abs_rank_diff (at this point)
+            if [[ -n "${board[$((xfile+i)),$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -gt 0 && $rank_diff -lt 0 ]]; then  # moving bottom-right
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile+i)),$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 && $rank_diff -lt 0 ]]; then  # moving bottom-left
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 && $rank_diff -gt 0 ]]; then  # moving top-left
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        else
+          return 1  # just in case
+        fi
+      else
+        return 1  # rank and file differences not the same
       fi
-      return 1
+      return 0  # passed all checks
       ;;
-    "♛"|"♕")
-      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horozontally
-        return 0  # still needs to check for pieces in the way
+    "♛"|"♕")  # . _ .
+      if [[ $abs_file_diff -gt 0 && $abs_rank_diff -eq 0 ]]; then  # moving horizontally
+        if [[ $file_diff -gt 0 ]]; then  # moving right
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile+i)),$xrank]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 ]]; then  # moving left
+          for (( i=1; i< abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$xrank]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        fi
+      elif [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
+        if [[ $rank_diff -gt 0 ]]; then  # moving forward (white, works for black, but black would be moving "backwards" in this case)
+          for (( i=1; i<abs_rank_diff; i++ )); do
+            if [[ -n "${board[$xfile,$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $rank_diff -lt 0 ]]; then  # moving backward
+          for (( i=1; i<abs_rank_diff; i++ )); do
+            if [[ -n "${board[$xfile,$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        fi
+      elif [[ $abs_file_diff -eq $abs_rank_diff ]]; then  # moving diagonally
+        if [[ $file_diff -gt 0 && $rank_diff -gt 0 ]]; then  # moving top-right
+          for (( i=1; i<abs_file_diff; i++ )); do  # we can use abs_file_diff to parse all four scenarios because it is the same as abs_rank_diff (at this point)
+            if [[ -n "${board[$((xfile+i)),$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -gt 0 && $rank_diff -lt 0 ]]; then  # moving bottom-right
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile+i)),$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 && $rank_diff -lt 0 ]]; then  # moving bottom-left
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$((xrank-i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        elif [[ $file_diff -lt 0 && $rank_diff -gt 0 ]]; then  # moving top-left
+          for (( i=1; i<abs_file_diff; i++ )); do
+            if [[ -n "${board[$((xfile-i)),$((xrank+i))]}" ]]; then
+              return 1  # piece in the way
+            fi
+          done
+        else
+          return 1  # just in case
+        fi
+      else
+        return 1  # is some other illegal move
       fi
-      if [[ $abs_file_diff -eq 0 && $abs_rank_diff -gt 0 ]]; then  # moving vertically
-        return 0
-      fi
-      if [[ $abs_file_diff -eq $abs_rank_diff ]]; then  # moving diagonally
-        return 0
-      fi
-      return 1
+      return 0  # passed all checks
       ;;
     "♚"|"♔")
       if [[ $abs_file_diff -lt 2 && $abs_rank_diff -lt 2 ]]; then
@@ -245,6 +344,15 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       ;;
   esac
 }
+
+
+check_check() {  # checks if king is in check after proposed move
+  local piece_type=$1
+  local to=$2
+  # will need to check for turn
+  true
+}
+
 
 check_if_legal_move() {
   local move=$1  # in UCI
@@ -277,13 +385,13 @@ check_if_legal_move() {
     return 1
   fi
 
-  # move this to after check_piece_moves
-  # if ! check_check "$piece" "$to"; then
-  #   return 1
-  # fi
-
   if ! check_piece_moves "$piece" "$xfile" "$xrank" "$file" "$rank"; then
     echo "Invalid move"
+    return 1
+  fi
+
+  if ! check_check "$piece" "$to"; then
+    echo "Check"
     return 1
   fi
 
