@@ -347,10 +347,258 @@ check_piece_moves() {  # is pawn, knight, queen, king...
 
 
 check_check() {  # checks if king is in check after proposed move
-  local piece_type=$1
-  local to=$2
-  # will need to check for turn
-  true
+  local piece=$1
+  local xfile=$2
+  local xrank=$3
+  local file=$4
+  local rank=$5
+
+  local xpiece="${board[$file,$rank]}"  # storing this because we need to check the proposed move and undo
+
+  board[$xfile,$xrank]=""  # moving for hypothetical check
+  board[$file,$rank]="$piece"
+
+  if [[ turn_r -eq 0 ]]; then  # white is moving, we're checking if after their proposed move, they're still in check
+    for f in {0..7}; do
+        for r in {0..7}; do
+            if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
+                king_file=$f
+                king_rank=$r
+                break 2
+            fi
+        done
+    done
+
+    # sideways checks for rooks and queens
+    for (( i=1; king_file+i <= 7; i++ )); do  # iterating right
+      if [[ -n "${board[$((king_file+i)),$king_rank]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$king_rank]}" == "♖" || "${board[$((king_file+i)),$king_rank]}" == "♕" ]]; then  # if black queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0; i++ )); do  # iterating left
+      if [[ -n "${board[$((king_file-i)),$king_rank]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$king_rank]}" == "♖" || "${board[$((king_file-i)),$king_rank]}" == "♕" ]]; then  # if black queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_rank+i <= 7; i++ )); do  # iterating forward
+      if [[ -n "${board[$king_file,$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$king_file,$((king_rank+i))]}" == "♖" || "${board[$king_file,$((king_rank+i))]}" == "♕" ]]; then  # if black queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_rank-i >= 0; i++ )); do  # iterating backward
+      if [[ -n "${board[$king_file,$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$king_file,$((king_rank-i))]}" == "♖" || "${board[$king_file,$((king_rank-i))]}" == "♕" ]]; then  # if black queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+
+    # diagonal checks for bishops and queens
+    for (( i=1; king_file+i <= 7 && king_rank+i <= 7; i++ )); do  # iterating forward-right 
+      if [[ -n "${board[$((king_file+i)),$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$((king_rank+i))]}" == "♗" || "${board[$((king_file+i)),$((king_rank+i))]}" == "♕" ]]; then  # if black queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file+i <= 7 && king_rank-i >= 0; i++ )); do  # iterating backward-right 
+      if [[ -n "${board[$((king_file+i)),$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$((king_rank-i))]}" == "♗" || "${board[$((king_file+i)),$((king_rank-i))]}" == "♕" ]]; then  # if black queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0 && king_rank-i >= 0; i++ )); do  # iterating backward-left 
+      if [[ -n "${board[$((king_file-i)),$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$((king_rank-i))]}" == "♗" || "${board[$((king_file-i)),$((king_rank-i))]}" == "♕" ]]; then  # if black queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0 && king_rank+i <= 7; i++ )); do  # iterating forward-left
+      if [[ -n "${board[$((king_file-i)),$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$((king_rank+i))]}" == "♗" || "${board[$((king_file-i)),$((king_rank+i))]}" == "♕" ]]; then  # if black queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+
+    # check for enemy knights
+    local knight_moves=("2 1" "2 -1" "-2 1" "-2 -1" "1 2" "1 -2" "-1 2" "-1 -2")
+    for kmove in "${knight_moves[@]}"; do
+      read df dr <<< "$kmove"
+      if [[ $f -le 7 && $f -ge 0 && $r -le 7 && $r -ge 0 ]]; then  # if inside board
+        if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♘" ]]; then  # if we see a threatening knight,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+      fi
+    done
+
+    # check for enemy pawns
+    if [[ "${board[$((king_file+1)),$((king_rank+1))]}" == "♙" || "${board[$((king_file-1)),$((king_rank+1))]}" == "♙" ]]; then
+      board[$xfile,$xrank]="$piece"  # undoing
+      board[$file,$rank]="$xpiece"
+      return 1  # fail
+    fi
+
+    # we made it past all reverse checks, undo and return success:
+    board[$xfile,$xrank]="$piece"
+    board[$file,$rank]="$xpiece"
+    return 0
+
+  else  # black is moving
+
+    for f in {0..7}; do
+        for r in {0..7}; do
+            if [[ "${board[$f,$r]}" == "♔" ]]; then  # find black king
+                king_file=$f
+                king_rank=$r
+                break 2
+            fi
+        done
+    done
+
+    # sideways checks for rooks and queens
+    for (( i=1; king_file+i <= 7; i++ )); do  # iterating right
+      if [[ -n "${board[$((king_file+i)),$king_rank]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$king_rank]}" == "♜" || "${board[$((king_file+i)),$king_rank]}" == "♛" ]]; then  # if white queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0; i++ )); do  # iterating left
+      if [[ -n "${board[$((king_file-i)),$king_rank]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$king_rank]}" == "♜" || "${board[$((king_file-i)),$king_rank]}" == "♛" ]]; then  # if white queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_rank+i <= 7; i++ )); do  # iterating forward
+      if [[ -n "${board[$king_file,$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$king_file,$((king_rank+i))]}" == "♜" || "${board[$king_file,$((king_rank+i))]}" == "♛" ]]; then  # if white queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_rank-i >= 0; i++ )); do  # iterating backward
+      if [[ -n "${board[$king_file,$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$king_file,$((king_rank-i))]}" == "♜" || "${board[$king_file,$((king_rank-i))]}" == "♛" ]]; then  # if white queen or rook,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+
+    # diagonal checks for bishops and queens
+    for (( i=1; king_file+i <= 7 && king_rank+i <= 7; i++ )); do  # iterating forward-right 
+      if [[ -n "${board[$((king_file+i)),$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$((king_rank+i))]}" == "♝" || "${board[$((king_file+i)),$((king_rank+i))]}" == "♛" ]]; then  # if white queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file+i <= 7 && king_rank-i >= 0; i++ )); do  # iterating backward-right 
+      if [[ -n "${board[$((king_file+i)),$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file+i)),$((king_rank-i))]}" == "♝" || "${board[$((king_file+i)),$((king_rank-i))]}" == "♛" ]]; then  # if white queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0 && king_rank-i >= 0; i++ )); do  # iterating backward-left 
+      if [[ -n "${board[$((king_file-i)),$((king_rank-i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$((king_rank-i))]}" == "♝" || "${board[$((king_file-i)),$((king_rank-i))]}" == "♛" ]]; then  # if white queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+    for (( i=1; king_file-i >= 0 && king_rank+i <= 7; i++ )); do  # iterating forward-left
+      if [[ -n "${board[$((king_file-i)),$((king_rank+i))]}" ]]; then  # if not empty
+        if [[ "${board[$((king_file-i)),$((king_rank+i))]}" == "♝" || "${board[$((king_file-i)),$((king_rank+i))]}" == "♛" ]]; then  # if white queen or bishop,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+        break  # break out of while loop if piece found that isn't threatening
+      fi
+    done
+
+    # check for enemy knights
+    local knight_moves=("2 1" "2 -1" "-2 1" "-2 -1" "1 2" "1 -2" "-1 2" "-1 -2")
+    for kmove in "${knight_moves[@]}"; do
+      read df dr <<< "$kmove"
+      if [[ $f -le 7 && $f -ge 0 && $r -le 7 && $r -ge 0 ]]; then  # if inside board
+        if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♞" ]]; then  # if we see a threatening knight,
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+      fi
+    done
+
+    # check for enemy pawns
+    if [[ "${board[$((king_file+1)),$((king_rank-1))]}" == "♟" || "${board[$((king_file-1)),$((king_rank-1))]}" == "♟" ]]; then
+      board[$xfile,$xrank]="$piece"  # undoing
+      board[$file,$rank]="$xpiece"
+      return 1  # fail
+    fi
+
+    # we made it past all reverse checks, undo and return success:
+    board[$xfile,$xrank]="$piece"
+    board[$file,$rank]="$xpiece"
+    return 0
+  fi
 }
 
 
@@ -390,7 +638,7 @@ check_if_legal_move() {
     return 1
   fi
 
-  if ! check_check "$piece" "$to"; then
+  if ! check_check "$piece" "$xfile" "$xrank" "$file" "$rank"; then
     echo "Check"
     return 1
   fi
