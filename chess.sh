@@ -355,6 +355,9 @@ check_check() {  # checks if king is in check after proposed move
 
   local xpiece="${board[$file,$rank]}"  # storing this because we need to check the proposed move and undo
 
+  local king_file=""
+  local king_rank=""
+
   board[$xfile,$xrank]=""  # moving for hypothetical check
   board[$file,$rank]="$piece"
 
@@ -456,8 +459,8 @@ check_check() {  # checks if king is in check after proposed move
     # check for enemy knights
     local knight_moves=("2 1" "2 -1" "-2 1" "-2 -1" "1 2" "1 -2" "-1 2" "-1 -2")
     for kmove in "${knight_moves[@]}"; do
-      read df dr <<< "$kmove"
-      if [[ $f -le 7 && $f -ge 0 && $r -le 7 && $r -ge 0 ]]; then  # if inside board
+      local df dr; read df dr <<< "$kmove"
+      if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then  # check within board
         if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♘" ]]; then  # if we see a threatening knight,
           board[$xfile,$xrank]="$piece"  # undoing
           board[$file,$rank]="$xpiece"
@@ -472,6 +475,8 @@ check_check() {  # checks if king is in check after proposed move
       board[$file,$rank]="$xpiece"
       return 1  # fail
     fi
+
+    # STILL NEED TO ADD OPP KING CHECKS
 
     # we made it past all reverse checks, undo and return success:
     board[$xfile,$xrank]="$piece"
@@ -594,6 +599,8 @@ check_check() {  # checks if king is in check after proposed move
       return 1  # fail
     fi
 
+    # STILL NEED TO ADD OPP KING CHECKS
+
     # we made it past all reverse checks, undo and return success:
     board[$xfile,$xrank]="$piece"
     board[$file,$rank]="$xpiece"
@@ -658,6 +665,78 @@ move_piece() {  # just move the piece assuming all legality checks have been don
   board[$xfile,$xrank]=""  # empty it's old location
   board[$file,$rank]="$piece"  # give new location the piece type
 }
+
+check_checkmate() {
+  if [[ "$turn_r" -eq 0 ]]; then  # checking if white is in checkmate
+    for f in {0..7}; do
+        for r in {0..7}; do
+            if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
+                king_file=$f
+                king_rank=$r
+                break 2
+            fi
+        done
+    done
+    
+    # first check current pos if in check without moving any pieces
+    if ! check_check "♚" "$king_file" "$king_rank" "$king_file" "$king_rank"; then  # if in check with current pos, check if there are any moves to save the position
+      # first, check if king can move anywhere safe:
+      # we first need king's possible squares to iterate through them and pass them to check_check
+      local king_moves=("1 1" "1 0" "1 -1" "0 -1" "-1 -1" "-1 0" "-1 1" "0 1")
+      for kngmove in "${king_moves[@]}"; do
+        local df dr; read df dr <<< "$kngmove"
+        if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then
+          if check_not_friendly "$((king_file+df))" "$((king_rank+dr))"; then  # if the king can move to a space that isn't friendly,
+            # check if this particular move is in check:
+            if check_check "♚" "$king_file" "$king_rank" "$((king_file+df))" "$((king_rank+dr))"; then  # if we ever get a 0, we're good
+              return 0
+            fi
+          fi
+        fi
+      done
+      
+      return 1
+
+      # if not, check all of white piece's possible moves to block or stop the checkmate
+    fi
+
+    return 0
+
+
+  else  # checking if black is in checkmate
+    for f in {0..7}; do
+        for r in {0..7}; do
+            if [[ "${board[$f,$r]}" == "♔" ]]; then  # find black king
+                king_file=$f
+                king_rank=$r
+                break 2
+            fi
+        done
+    done
+
+    # first check current pos if in check without moving any pieces
+    if ! check_check "♔" "$king_file" "$king_rank" "$king_file" "$king_rank"; then  # if in check with current pos, check if there are any moves to save the position
+      local king_moves=("1 1" "1 0" "1 -1" "0 -1" "-1 -1" "-1 0" "-1 1" "0 1")
+      for kngmove in "${king_moves[@]}"; do
+        local df dr; read df dr <<< "$kngmove"
+        if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then
+          if check_not_friendly "$((king_file+df))" "$((king_rank+dr))"; then  # if the king can move to a space that isn't friendly,
+            # check if this particular move is in check:
+            if check_check "♔" "$king_file" "$king_rank" "$((king_file+df))" "$((king_rank+dr))"; then  # if we ever get a 0, we're good
+              return 0
+            fi
+          fi
+        fi
+      done
+      
+      return 1
+    fi
+
+    return 0
+
+  fi
+}
+
 # setting up terminal to clear and hide cursor
 tput smcup
 tput civis
@@ -667,27 +746,35 @@ trap 'tput cnorm; tput rmcup; exit 0' INT TERM EXIT
 
 while true; do
   print_all "$error"
-  if [[ turn_r -eq 0 ]]; then
-    tput cup 25 66       # move cursor to setup for input
-    read -p "W > " move  # prompt for move, store in move var
-    if check_if_legal_move "$move"; then
-      move_piece "$move"
-      turn_r=$((turn_r+1))
-      turn=$((turn+1))
-      error=""
+  if ! check_checkmate; then  # if we got a '1', or checkmate
+    tput cup 15 30
+    echo -e "CHECK${bgLight}MATE"
+    while true; do  # halt game
+      true
+    done
+  else  # otherwise, run as normal
+    if [[ turn_r -eq 0 ]]; then
+      tput cup 25 66       # move cursor to setup for input
+      read -p "W > " move  # prompt for move, store in move var
+      if check_if_legal_move "$move"; then
+        move_piece "$move"
+        turn_r=$((turn_r+1))
+        turn=$((turn+1))
+        error=""
+      else
+        error=$(check_if_legal_move "$move")
+      fi
     else
-      error=$(check_if_legal_move "$move")
-    fi
-  else
-    tput cup 25 66
-    read -p "B > " move
-    if check_if_legal_move "$move"; then
-      move_piece "$move"
-      turn_r=$((turn_r-1))
-      turn=$((turn+1))
-      error=""
-    else
-      error=$(check_if_legal_move "$move")
+      tput cup 25 66
+      read -p "B > " move
+      if check_if_legal_move "$move"; then
+        move_piece "$move"
+        turn_r=$((turn_r-1))
+        turn=$((turn+1))
+        error=""
+      else
+        error=$(check_if_legal_move "$move")
+      fi
     fi
   fi
   clear
