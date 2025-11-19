@@ -175,6 +175,8 @@ check_piece_moves() {  # is pawn, knight, queen, king...
   local abs_file_diff=${file_diff#-}  # most pieces move symmetrically, so these values can help us abstract a lot
   local abs_rank_diff=${rank_diff#-}
 
+  local i
+
   # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
     "♟")
@@ -358,6 +360,8 @@ check_check() {  # checks if king is in check after proposed move
   local king_file=""
   local king_rank=""
 
+  local i df dr kmove kngmove f r
+
   board[$xfile,$xrank]=""  # moving for hypothetical check
   board[$file,$rank]="$piece"
 
@@ -459,7 +463,7 @@ check_check() {  # checks if king is in check after proposed move
     # check for enemy knights
     local knight_moves=("2 1" "2 -1" "-2 1" "-2 -1" "1 2" "1 -2" "-1 2" "-1 -2")
     for kmove in "${knight_moves[@]}"; do
-      local df dr; read df dr <<< "$kmove"
+      read df dr <<< "$kmove"
       if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then  # check within board
         if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♘" ]]; then  # if we see a threatening knight,
           board[$xfile,$xrank]="$piece"  # undoing
@@ -476,7 +480,18 @@ check_check() {  # checks if king is in check after proposed move
       return 1  # fail
     fi
 
-    # STILL NEED TO ADD OPP KING CHECKS
+    # check if moved into enemy king
+    local king_moves=("1 1" "1 0" "1 -1" "0 -1" "-1 -1" "-1 0" "-1 1" "0 1")
+    for kngmove in "${king_moves[@]}"; do
+      read df dr <<< "$kngmove"
+      if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then  # check within board
+        if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♔" ]]; then  # if any of the surrounding squares are enemy king, we're trying to move into check
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+      fi
+    done
 
     # we made it past all reverse checks, undo and return success:
     board[$xfile,$xrank]="$piece"
@@ -583,7 +598,7 @@ check_check() {  # checks if king is in check after proposed move
     local knight_moves=("2 1" "2 -1" "-2 1" "-2 -1" "1 2" "1 -2" "-1 2" "-1 -2")
     for kmove in "${knight_moves[@]}"; do
       read df dr <<< "$kmove"
-      if [[ $f -le 7 && $f -ge 0 && $r -le 7 && $r -ge 0 ]]; then  # if inside board
+      if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then  # check within board
         if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♞" ]]; then  # if we see a threatening knight,
           board[$xfile,$xrank]="$piece"  # undoing
           board[$file,$rank]="$xpiece"
@@ -599,7 +614,18 @@ check_check() {  # checks if king is in check after proposed move
       return 1  # fail
     fi
 
-    # STILL NEED TO ADD OPP KING CHECKS
+    # check for adjacent king
+    local king_moves=("1 1" "1 0" "1 -1" "0 -1" "-1 -1" "-1 0" "-1 1" "0 1")
+    for kngmove in "${king_moves[@]}"; do
+      local df dr; read df dr <<< "$kngmove"
+      if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then  # check within board
+        if [[ "${board[$((king_file+df)),$((king_rank+dr))]}" == "♚" ]]; then  # if any of the surrounding squares are enemy king, we're trying to move into check
+          board[$xfile,$xrank]="$piece"  # undoing
+          board[$file,$rank]="$xpiece"
+          return 1  # fail
+        fi
+      fi
+    done
 
     # we made it past all reverse checks, undo and return success:
     board[$xfile,$xrank]="$piece"
@@ -667,6 +693,8 @@ move_piece() {  # just move the piece assuming all legality checks have been don
 }
 
 check_checkmate() {
+  local f r kngmove col row pcol prow
+
   if [[ "$turn_r" -eq 0 ]]; then  # checking if white is in checkmate
     for f in {0..7}; do
         for r in {0..7}; do
@@ -688,22 +716,48 @@ check_checkmate() {
         if check_within_board "$((king_file+df))" "$((king_rank+dr))"; then
           if check_not_friendly "$((king_file+df))" "$((king_rank+dr))"; then  # if the king can move to a space that isn't friendly,
             # check if this particular move is in check:
-            if check_check "♚" "$king_file" "$king_rank" "$((king_file+df))" "$((king_rank+dr))"; then  # if we ever get a 0, we're good
+            if check_check "♚" "$king_file" "$king_rank" "$((king_file+df))" "$((king_rank+dr))"; then  # if we ever get a 0, the king can escape with a move
               return 0
             fi
           fi
         fi
       done
-      
-      return 1
 
-      # if not, check all of white piece's possible moves to block or stop the checkmate
+      # before failing, we need to check if any other pieces can block or capture the checking piece.
+      # been thinking about some algorithms I could implement to make this more efficient, maybe checking
+      # the most mobile pieces first, or the closest to the king, maybe using what piece is checking to make
+      # decisions, blocking los, checking intersects first...
+      # I think for this application, it's more trouble than it's worth. I'll just check all friendly piece's 
+      # all possible positions, and if any one position finds itself out of check, it isn't checkmate.
+      
+#      for col in {0..7}; do
+#        for row in {0..7}; do
+#          local piece="${board[$col,$row]}"
+#          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
+#            "♟"|"♞"|"♝"|"♜"|"♛")
+#              for pcol in {0..7}; do
+#                for prow in {0..7}; do
+#                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
+#                    if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then      # check if that move saves the king
+#                      return 0
+#                    fi
+#                  fi
+#                done
+#              done
+#              ;;
+#            *) ;;
+#          esac
+#        done
+#      done
+      
+      return 1  # could not find a saving move
+
     fi
 
-    return 0
+    return 0  # king is not in check
 
 
-  else  # checking if black is in checkmate
+  else  # checking if black is in checkmate, same thing as white
     for f in {0..7}; do
         for r in {0..7}; do
             if [[ "${board[$f,$r]}" == "♔" ]]; then  # find black king
@@ -729,10 +783,31 @@ check_checkmate() {
         fi
       done
       
-      return 1
+      # king couldn't move out of check - now checking if any other pieces can save or stall
+#      for col in {0..7}; do
+#        for row in {0..7}; do
+#          local piece="${board[$col,$row]}"
+#          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
+#            "♙"|"♘"|"♗"|"♖"|"♕")            # and accept the consequence that it's going to take *forever* to run through all possible moves
+#              for pcol in {0..7}; do
+#                for prow in {0..7}; do
+#                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
+#                    if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then      # check if that move saves the king
+#                      return 0
+#                    fi
+#                  fi
+#                done
+#              done
+#              ;;
+#          esac
+#        done
+#      done
+      # I love for loops, ik. There's definitely a better way to do this, but this took me less than 10 mins, using functions I already wrote.
+
+      return 1  # could not find a saving move
     fi
 
-    return 0
+    return 0  # king is not in check
 
   fi
 }
