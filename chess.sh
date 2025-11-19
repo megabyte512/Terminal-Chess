@@ -180,9 +180,9 @@ check_piece_moves() {  # is pawn, knight, queen, king...
   # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
     "♟")
-      if [[ $xrank -eq 1 && $rank_diff -lt 3 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank-1))]} == "" ]]; then
+      if [[ $abs_file_diff -eq 0 && $xrank -eq 1 && $rank_diff -eq 2 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank-1))]} == "" ]]; then
         return 0  # first move, two squares ahead are empty
-      elif [[ $rank_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
         return 0  # moving forward one, space ahead is empty
       elif [[ $rank_diff -eq 1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
         return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
@@ -332,9 +332,9 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 1
       ;;
     "♙")
-      if [[ $xrank -eq 6 && $rank_diff -gt -3 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank+1))]} == "" ]]; then
+      if [[ $abs_file_diff -eq 0 && $xrank -eq 6 && $rank_diff -eq -2 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank+1))]} == "" ]]; then
         return 0  # first move, two squares ahead are empty
-      elif [[ $rank_diff -eq -1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq -1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
         return 0  # moving forward one, space ahead is empty
       elif [[ $rank_diff -eq -1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
         return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
@@ -730,25 +730,27 @@ check_checkmate() {
       # I think for this application, it's more trouble than it's worth. I'll just check all friendly piece's 
       # all possible positions, and if any one position finds itself out of check, it isn't checkmate.
       
-#      for col in {0..7}; do
-#        for row in {0..7}; do
-#          local piece="${board[$col,$row]}"
-#          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
-#            "♟"|"♞"|"♝"|"♜"|"♛")
-#              for pcol in {0..7}; do
-#                for prow in {0..7}; do
-#                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
-#                    if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then      # check if that move saves the king
-#                      return 0
-#                    fi
-#                  fi
-#                done
-#              done
-#              ;;
-#            *) ;;
-#          esac
-#        done
-#      done
+      for col in {0..7}; do
+        for row in {0..7}; do
+          local piece="${board[$col,$row]}"
+          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
+            "♟"|"♞"|"♝"|"♜"|"♛")
+              for pcol in {0..7}; do
+                for prow in {0..7}; do
+                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
+                    if check_not_friendly "$pcol" "$prow"; then                      # check_piece_moves never checked for friendly, because it was written with friendly already checked in mind
+                      if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then    # check if that move saves the king
+                        return 0
+                      fi
+                    fi
+                  fi
+                done
+              done
+              ;;
+            *) ;;
+          esac
+        done
+      done
       
       return 1  # could not find a saving move
 
@@ -784,24 +786,26 @@ check_checkmate() {
       done
       
       # king couldn't move out of check - now checking if any other pieces can save or stall
-#      for col in {0..7}; do
-#        for row in {0..7}; do
-#          local piece="${board[$col,$row]}"
-#          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
-#            "♙"|"♘"|"♗"|"♖"|"♕")            # and accept the consequence that it's going to take *forever* to run through all possible moves
-#              for pcol in {0..7}; do
-#                for prow in {0..7}; do
-#                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
-#                    if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then      # check if that move saves the king
-#                      return 0
-#                    fi
-#                  fi
-#                done
-#              done
-#              ;;
-#          esac
-#        done
-#      done
+      for col in {0..7}; do
+        for row in {0..7}; do
+          local piece="${board[$col,$row]}"
+          case "$piece" in  # this while is going to be massive if I write all of the piece legal moves. It will be easier to check every square with the function I already wrote,
+            "♙"|"♘"|"♗"|"♖"|"♕")            # and accept the consequence that it's going to take *forever* to run through all possible moves
+              for pcol in {0..7}; do
+                for prow in {0..7}; do
+                  if check_piece_moves "$piece" "$col" "$row" "$pcol" "$prow"; then  # if we find a legal move for a friendly:
+                    if check_not_friendly "$pcol" "$prow"; then                      # check_piece_moves never checked for friendly, because it was written with friendly already checked in mind
+                      if check_check "$piece" "$col" "$row" "$pcol" "$prow"; then    # check if that move saves the king
+                        return 0
+                      fi
+                    fi
+                  fi
+                done
+              done
+              ;;
+          esac
+        done
+      done
       # I love for loops, ik. There's definitely a better way to do this, but this took me less than 10 mins, using functions I already wrote.
 
       return 1  # could not find a saving move
