@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# need to add castling, maybe en passant, display captured pieces and how much material either player is up.
+
 # Setup, dependencies
 bgLight="\033[48;5;235m"
 reset="\033[0m"
@@ -689,7 +691,13 @@ move_piece() {  # just move the piece assuming all legality checks have been don
 
   local piece="${board[$xfile,$xrank]}"  # save piece that we'll move
   board[$xfile,$xrank]=""  # empty it's old location
-  board[$file,$rank]="$piece"  # give new location the piece type
+  if [[ "$piece" == "♟" && "$rank" -eq 7 ]]; then  # promoting white pawn
+    board[$file,$rank]="♛"
+  elif [[ "$piece" == "♙" && "$rank" -eq 0 ]]; then  #promoting black pawn
+    board[$file,$rank]="♕"
+  else
+    board[$file,$rank]="$piece"  # give new location the piece type
+  fi
 }
 
 check_checkmate() {
