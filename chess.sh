@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# need to add castling, maybe en passant, display captured pieces and how much material either player is up.
+# need to display captured pieces and how much material either player is up.
 
 # Setup, dependencies
 bgLight="\033[48;5;235m"
@@ -182,11 +182,11 @@ check_piece_moves() {  # is pawn, knight, queen, king...
   # WE DON'T NEED TO IMPORT TURN. WE JUST NEED TO CHECK IF THERE'S ANY PIECE BETWEEN FROM AND TO
   case $piece_type in
     "♟")
-      if [[ $abs_file_diff -eq 0 && $xrank -eq 1 && $rank_diff -eq 2 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank-1))]} == "" ]]; then
+      if [[ $abs_file_diff -eq 0 && $xrank -eq 1 && $rank_diff -eq 2 && -z ${board[$proposed_file,$proposed_rank]} && -z ${board[$proposed_file,$((proposed_rank-1))]} ]]; then
         return 0  # first move, two squares ahead are empty
-      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq 1 && -z ${board[$proposed_file,$proposed_rank]} ]]; then
         return 0  # moving forward one, space ahead is empty
-      elif [[ $rank_diff -eq 1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
+      elif [[ $rank_diff -eq 1 && $abs_file_diff -eq 1 && -n ${board[$proposed_file,$proposed_rank]} ]]; then
         return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
       fi
       return 1
@@ -328,17 +328,42 @@ check_piece_moves() {  # is pawn, knight, queen, king...
       return 0  # passed all checks
       ;;
     "♚"|"♔")
-      if [[ $abs_file_diff -lt 2 && $abs_rank_diff -lt 2 ]]; then
+      if [[ ($abs_file_diff -le 1 && $abs_rank_diff -le 1) ]]; then  # simple move
         return 0
+      fi
+      if [[ $piece_type == "♚" ]]; then
+        if [[ $xfile -eq 4 && $xrank -eq 0 && $proposed_file -eq 6 && $proposed_rank -eq 0 && -z ${board[5,0]} && ${board[7,0]} == "♜" ]]; then  # castling king-side
+          if check_check "♚" "$xfile" "$xrank" "$xfile" "$xrank"; then  # allow castle if not in check
+            board[7,0]=""
+            board[5,0]="♜"
+            return 0
+          fi
+        elif [[ $xfile -eq 4 && $xrank -eq 0 && $proposed_file -eq 2 && $proposed_rank -eq 0 && -z ${board[3,0]} && ${board[0,0]} == "♜" ]]; then  # castling queen-side
+          board[0,0]=""
+          board[3,0]="♜"
+          return 0
+        fi
+      elif [[ $piece_type == "♔" ]]; then
+        if [[ $xfile -eq 4 && $xrank -eq 7 && $proposed_file -eq 6 && $proposed_rank -eq 7 && -z ${board[5,7]} && ${board[7,7]} == "♖" ]]; then  # castling king-side
+          if check_check "♔" "$xfile" "$xrank" "$xfile" "$xrank"; then  # allow castle if not in check
+            board[7,7]=""
+            board[5,7]="♖"
+            return 0
+          fi
+        elif [[ $xfile -eq 4 && $xrank -eq 7 && $proposed_file -eq 2 && $proposed_rank -eq 7 && -z ${board[3,7]} && ${board[0,7]} == "♖" ]]; then  # castling queen-side
+          board[0,7]=""
+          board[3,7]="♖"
+          return 0
+        fi
       fi
       return 1
       ;;
     "♙")
-      if [[ $abs_file_diff -eq 0 && $xrank -eq 6 && $rank_diff -eq -2 && ${board[$proposed_file,$proposed_rank]} == "" && ${board[$proposed_file,$((proposed_rank+1))]} == "" ]]; then
+      if [[ $abs_file_diff -eq 0 && $xrank -eq 6 && $rank_diff -eq -2 && -z ${board[$proposed_file,$proposed_rank]} && -z ${board[$proposed_file,$((proposed_rank+1))]} ]]; then
         return 0  # first move, two squares ahead are empty
-      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq -1 && ${board[$proposed_file,$proposed_rank]} == "" ]]; then
+      elif [[ $abs_file_diff -eq 0 && $rank_diff -eq -1 && -z ${board[$proposed_file,$proposed_rank]} ]]; then
         return 0  # moving forward one, space ahead is empty
-      elif [[ $rank_diff -eq -1 && $abs_file_diff -eq 1 && ${board[$proposed_file,$proposed_rank]} != "" ]]; then
+      elif [[ $rank_diff -eq -1 && $abs_file_diff -eq 1 && -n ${board[$proposed_file,$proposed_rank]} ]]; then
         return 0  # can move diagonally if piece to capture. We've already checked at this point if friendly or not
       fi
       return 1
