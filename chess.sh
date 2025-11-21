@@ -15,6 +15,8 @@ for row in {0..7}; do
   done
 done
 
+declare -a captured_pieces
+
 board[0,7]="♖"; board[1,7]="♘"; board[2,7]="♗"; board[3,7]="♕"; board[4,7]="♔"; board[5,7]="♗"; board[6,7]="♘"; board[7,7]="♖";
 board[0,6]="♙"; board[1,6]="♙"; board[2,6]="♙"; board[3,6]="♙"; board[4,6]="♙"; board[5,6]="♙"; board[6,6]="♙"; board[7,6]="♙";
 board[0,1]="♟"; board[1,1]="♟"; board[2,1]="♟"; board[3,1]="♟"; board[4,1]="♟"; board[5,1]="♟"; board[6,1]="♟"; board[7,1]="♟";
@@ -90,11 +92,175 @@ print_char() {  # actually prints the piece given the turn, unicode char, and po
   tput sgr0
 }
 
+print_material() {  # uses captured_pieces array to calculate and print material difference and captured pieces
+  local material_disparity=0
+
+  local num_wpawns=0
+  local num_wknights=0
+  local num_wbishops=0
+  local num_wrooks=0
+  local num_wqueens=0
+  
+  local num_bpawns=0
+  local num_bknights=0
+  local num_bbishops=0
+  local num_brooks=0
+  local num_bqueens=0
+
+  local i
+
+  if [[ ${#captured_pieces[@]} -ne 0 ]]; then  # if not empty, do the things
+    for cp in "${captured_pieces[@]}"; do  # calculates disparity and counts number of each piece
+      case $cp in
+        "♟")
+          num_wpawns=$((num_wpawns+1))
+          material_disparity=$((material_disparity-1))
+          ;;
+        "♞")
+          num_wknights=$((num_wknights+1))
+          material_disparity=$((material_disparity-3))
+          ;;
+        "♝")
+          num_wbishops=$((num_wbishops+1))
+          material_disparity=$((material_disparity-3))
+          ;;
+        "♜")
+          num_wrooks=$((num_wrooks+1))
+          material_disparity=$((material_disparity-5))
+          ;;
+        "♛")
+          num_wqueens=$((num_wqueens+1))
+          material_disparity=$((material_disparity-8))
+          ;;
+        "♙")
+          num_bpawns=$((num_bpawns+1))
+          material_disparity=$((material_disparity+1))
+          ;;
+        "♘")
+          num_bknights=$((num_bknights+1))
+          material_disparity=$((material_disparity+3))
+          ;;
+        "♗")
+          num_bbishops=$((num_bbishops+1))
+          material_disparity=$((material_disparity+3))
+          ;;
+        "♖")
+          num_brooks=$((num_brooks+1))
+          material_disparity=$((material_disparity+5))
+          ;;
+        "♕")
+          num_bqueens=$((num_bqueens+1))
+          material_disparity=$((material_disparity+8))
+          ;;
+        "*") ;;
+      esac
+    done
+
+    if [[ turn_r -eq 0 ]]; then  # flips displayed material
+      if [[ $material_disparity -gt 0 ]]; then  # adds positive sign to white
+        tput cup 22 66
+        echo -e "+${material_disparity}"
+        tput cup 7 66
+        echo "$((-1*material_disparity))"
+      elif [[ $material_disparity -lt 0 ]]; then  # adds positive sign to black
+        tput cup 22 66
+        echo "$material_disparity"
+        tput cup 7 66
+        echo -e "+$((-1*material_disparity))"
+      fi
+
+      tput cup 7 70
+      for (( i=0; i < num_wpawns; i++)); do
+        echo -n "♟"
+      done
+      for (( i=0; i < num_wknights; i++)); do
+        echo -n "♞"
+      done
+      for (( i=0; i < num_wbishops; i++)); do
+        echo -n "♝"
+      done
+      for (( i=0; i < num_wrooks; i++)); do
+        echo -n "♜"
+      done
+      for (( i=0; i < num_wqueens; i++)); do
+        echo -n "♛"
+      done
+
+      tput cup 22 70
+      for (( i=0; i < num_bpawns; i++)); do
+        echo -n "♙"
+      done
+      for (( i=0; i < num_bknights; i++)); do
+        echo -n "♘"
+      done
+      for (( i=0; i < num_bbishops; i++)); do
+        echo -n "♗"
+      done
+      for (( i=0; i < num_brooks; i++)); do
+        echo -n "♖"
+      done
+      for (( i=0; i < num_bqueens; i++)); do
+        echo -n "♕"
+      done
+
+    else
+      if [[ $material_disparity -gt 0 ]]; then
+        tput cup 7 66
+        echo -e "+${material_disparity}"
+        tput cup 22 66
+        echo "$((-1*material_disparity))"
+      elif [[ $material_disparity -lt 0 ]]; then
+        tput cup 7 66
+        echo "$material_disparity"
+        tput cup 22 66
+        echo -e "+$((-1*material_disparity))"
+      fi
+
+      tput cup 22 70
+      for (( i=0; i < num_wpawns; i++)); do
+        echo -n "♟"
+      done
+      for (( i=0; i < num_wknights; i++)); do
+        echo -n "♞"
+      done
+      for (( i=0; i < num_wbishops; i++)); do
+        echo -n "♝"
+      done
+      for (( i=0; i < num_wrooks; i++)); do
+        echo -n "♜"
+      done
+      for (( i=0; i < num_wqueens; i++)); do
+        echo -n "♛"
+      done
+
+      tput cup 7 70
+      for (( i=0; i < num_bpawns; i++)); do
+        echo -n "♙"
+      done
+      for (( i=0; i < num_bknights; i++)); do
+        echo -n "♘"
+      done
+      for (( i=0; i < num_bbishops; i++)); do
+        echo -n "♗"
+      done
+      for (( i=0; i < num_brooks; i++)); do
+        echo -n "♖"
+      done
+      for (( i=0; i < num_bqueens; i++)); do
+        echo -n "♕"
+      done
+
+    fi
+
+  fi
+}
+
 print_all() {
   local error=$1
   tput sgr0
   draw_board
   print_coords
+  print_material
   for row in {0..7}; do
     for col in {0..7}; do
       local piece="${board[$col,$row]}"
@@ -394,13 +560,13 @@ check_check() {  # checks if king is in check after proposed move
 
   if [[ turn_r -eq 0 ]]; then  # white is moving, we're checking if after their proposed move, they're still in check
     for f in {0..7}; do
-        for r in {0..7}; do
-            if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
-                king_file=$f
-                king_rank=$r
-                break 2
-            fi
-        done
+      for r in {0..7}; do
+        if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
+          king_file=$f
+          king_rank=$r
+          break 2
+        fi
+      done
     done
 
     # sideways checks for rooks and queens
@@ -715,13 +881,21 @@ move_piece() {  # just move the piece assuming all legality checks have been don
   local file rank; read file rank <<< "$converted_to"  # file and rank in <num><num> (0-7)
 
   local piece="${board[$xfile,$xrank]}"  # save piece that we'll move
+  local xpiece="${board[$file,$rank]}"   # captured piece, could be empty
   board[$xfile,$xrank]=""  # empty it's old location
+  
+  # promoting here
   if [[ "$piece" == "♟" && "$rank" -eq 7 ]]; then  # promoting white pawn
     board[$file,$rank]="♛"
-  elif [[ "$piece" == "♙" && "$rank" -eq 0 ]]; then  #promoting black pawn
+  elif [[ "$piece" == "♙" && "$rank" -eq 0 ]]; then  # promoting black pawn
     board[$file,$rank]="♕"
-  else
+  else                                              # no promotion
     board[$file,$rank]="$piece"  # give new location the piece type
+  fi
+
+  # add captured piece (if any) to list of captured pieces.
+  if [[ -n "$xpiece" ]]; then
+    captured_pieces+=( "$xpiece" )
   fi
 }
 
@@ -730,13 +904,13 @@ check_checkmate() {
 
   if [[ "$turn_r" -eq 0 ]]; then  # checking if white is in checkmate
     for f in {0..7}; do
-        for r in {0..7}; do
-            if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
-                king_file=$f
-                king_rank=$r
-                break 2
-            fi
-        done
+      for r in {0..7}; do
+        if [[ "${board[$f,$r]}" == "♚" ]]; then  # find white king
+          king_file=$f
+          king_rank=$r
+          break 2
+        fi
+      done
     done
     
     # first check current pos if in check without moving any pieces
