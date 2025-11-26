@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# need to display captured pieces and how much material either player is up.
-
 # Setup, dependencies
 bgLight="\033[48;5;235m"
 reset="\033[0m"
+turn=0    # global variable that counts up to display how many turns have passed
 turn_r=0  # global variable that flips every time the turn is handed off
 
 declare -A board
@@ -260,6 +259,8 @@ print_all() {
   tput sgr0
   draw_board
   print_coords
+  tput cup 4 66
+  echo "$turn"
   print_material
   for row in {0..7}; do
     for col in {0..7}; do
