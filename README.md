@@ -14,3 +14,9 @@ and material difference.
 * Mouse compatibility for easier moving
 * Undo move function
 * Online play
+* Polish
+  * En passant
+  * Other promotion options
+  * Corrected castling
+    * Only when it's rook and king's first move
+    * Can't castle out of check (working inconsistently right now)
