@@ -4,6 +4,11 @@ This is a little chess game for the terminal that I made for myself. 2-player, s
 however, this terminal chess game is written exclusively in bash and features castling, pawn promotion (just to queens :( sorry if you wanted to chess mog your friend and under-promote), UCI coordinates that flip with perspective, displayed captured pieces
 and material difference.
 
+![opening](screenshots/opening.png)
+![middlegame](screenshots/middlegame.png)
+![checkmate](screenshots/checkmate.png)
+
+
 ## Ideas
 
 * Bots!
@@ -19,4 +24,4 @@ and material difference.
   * Other promotion options
   * Corrected castling
     * Only when it's rook and king's first move
-    * Can't castle out of check (working inconsistently right now)
+    * Can't castle out of, or through, check
